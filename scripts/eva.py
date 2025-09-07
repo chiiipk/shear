@@ -209,7 +209,7 @@ def evaluate_sts(model, tokenizer, embedding_head=None, dataset_name="mteb/stsbe
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Evaluate BGE-M3 pruned model')
-    parser.add_argument('--model-path', type=str, default='experiments/production_hf_masked',
+    parser.add_argument('--model-path', type=str, default='/kaggle/input/shear/experiments/production_hf_structural',
                        help='Path to the pruned model directory')
     args = parser.parse_args()
     
@@ -229,3 +229,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
