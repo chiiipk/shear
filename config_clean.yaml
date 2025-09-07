@@ -43,11 +43,11 @@ optimizer:
   weight_decay: 0.01
 
 # Training settings
-batch_size: 16
+batch_size: 8
 max_length: 512
 max_duration: "10000ba"
 eval_interval: "500ba"
-save_interval: "1000ba"
+save_interval: "5000ba"
 save_folder: "experiments/production"
 seed: 42
 device: gpu
@@ -55,3 +55,4 @@ precision: "amp_bf16"
 
 # HuggingFace model export (automatic after training)
 # Saves to: {save_folder}_hf/
+
