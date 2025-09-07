@@ -1,0 +1,57 @@
+# Production BGE-M3 Pruning Configuration
+# Focused on head/layer/intermediate pruning with MTEB support
+
+model:
+  base_model: "BAAI/bge-m3"
+  use_sts_loss: true
+  use_contrastive_loss: true
+  temperature: 0.07
+  # Loss weighting (explicit for clarity; sparse/multi disabled by default)
+  w_dense: 1.0
+  w_sparse: 0.0
+  w_multi: 0.0
+  w_agree: 0.0
+  # L0 constraint schedule (optional overrides)
+  l0_weight_warmup: 100   # steps
+  l0_weight_max: 10.0
+  
+  l0_module:
+    # Production pruning: head, layer, intermediate only
+    pruning_modules: ["layer", "head", "intermediate"]
+    start_sparsity: 0.0
+    lagrangian_warmup_steps: "500ba"  # Faster warmup for stronger pressure
+    eval_target_model: true
+    
+      # Dynamic sparsity scheduling
+    sparsity_warmup_steps: "100ba"     # Start pruning earlier
+    sparsity_anneal_steps: "2000ba"    # Faster ramp
+    
+    # Target architecture for ~50% reduction (standardized key names)
+    target_model:
+      num_hidden_layers: 12      # From 24
+      num_attention_heads: 8     # From 16
+      intermediate_size: 2048    # From 4096
+    # target_sparsity: 0.5  # Explicit overall target (approx)
+    temperature: 0.5  # Sharper mask distribution
+    l0_lambda: 0.01  # Strength for additional regularization (used in entropy reg)
+
+optimizer:
+  # Stable learning rates for production
+  lr: 3e-5
+  betas: [0.9, 0.999]
+  eps: 1.0e-8
+  weight_decay: 0.01
+
+# Training settings
+batch_size: 16
+max_length: 512
+max_duration: "10000ba"
+eval_interval: "500ba"
+save_interval: "1000ba"
+save_folder: "experiments/production"
+seed: 42
+device: gpu
+precision: "amp_bf16"
+
+# HuggingFace model export (automatic after training)
+# Saves to: {save_folder}_hf/
