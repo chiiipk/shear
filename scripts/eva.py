@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Evaluate pruned BGE-M3 model on STS dataset
 """
@@ -12,7 +11,6 @@ from scipy.stats import spearmanr, pearsonr
 import torch.nn.functional as F
 from tqdm import tqdm
 import os
-from utils.shape_aware_loader import load_xlmr_clean_pruned
 
 
 def load_embedding_head(model_path):
@@ -85,44 +83,29 @@ def load_embedding_head(model_path):
         return dense_head
 
 
-def load_pruned_model(model_path, device: str | None = None, dtype=torch.float32):
-    """Load pruned model (structural hoặc masked) + tokenizer + embedding head.
-    - Nếu là structural (clean-pruned) ⇒ tự dùng shape-aware loader (không init random).
-    - Nếu là masked/base ⇒ dùng AutoModel bình thường.
-    """
+def load_pruned_model(model_path):
+    """Load the pruned model, tokenizer, and embedding head"""
     print(f"Loading pruned model from {model_path}")
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-
-    # 1) thử load bình thường (masked/base)
-    try:
-        model = AutoModel.from_pretrained(model_path, torch_dtype=dtype).to(device)
-        tokenizer = AutoTokenizer.from_pretrained(model_path)
-    except RuntimeError as e:
-        # 2) nếu dính size-mismatch ⇒ structural ⇒ dùng loader co-shape
-        msg = str(e)
-        if "size mismatch" in msg or "mismatched sizes" in msg:
-            print("ℹ️ Detected clean-pruned (structural) checkpoint → using shape-aware loader…")
-            model, tokenizer = load_xlmr_clean_pruned(model_path, device=device, dtype=dtype)
-        else:
-            raise
-
-    # 3) load embedding head (nếu có) và move sang device
+    
+    # Load backbone
+    model = AutoModel.from_pretrained(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    
+    # Load embedding head
     embedding_head = load_embedding_head(model_path)
-    if embedding_head is not None:
-        embedding_head = embedding_head.to(device).eval()
-
-    # Info
+    
+    # Print model info
     total_params = sum(p.numel() for p in model.parameters())
     if embedding_head is not None:
         total_params += sum(p.numel() for p in embedding_head.parameters())
+    
     print(f"Model loaded: {total_params:,} parameters")
     print(f"Layers: {model.config.num_hidden_layers}")
-    print(f"Heads per layer: {model.config.num_attention_heads}")
+    print(f"Attention heads: {model.config.num_attention_heads}")
     print(f"Intermediate size: {model.config.intermediate_size}")
-    print(f"Using embedding head: {embedding_head is not None} | device: {device}")
-
+    print(f"Using embedding head: {embedding_head is not None}")
+    
     return model, tokenizer, embedding_head
-
 
 
 def encode_texts(texts, model, tokenizer, embedding_head=None, batch_size=32, max_length=512):
@@ -144,7 +127,7 @@ def encode_texts(texts, model, tokenizer, embedding_head=None, batch_size=32, ma
                 truncation=True,
                 max_length=max_length,
                 return_tensors="pt"
-            ).to(device)
+            )
             
             # Get embeddings from backbone
             outputs = model(**inputs)
@@ -225,7 +208,7 @@ def evaluate_sts(model, tokenizer, embedding_head=None, dataset_name="mteb/stsbe
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Evaluate BGE-M3 pruned model')
-    parser.add_argument('--model-path', type=str, default='/kaggle/input/shear/experiments/production_hf_structural',
+    parser.add_argument('--model-path', type=str, default='experiments/production_hf_masked',
                        help='Path to the pruned model directory')
     args = parser.parse_args()
     
@@ -245,5 +228,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
